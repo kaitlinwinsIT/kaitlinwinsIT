@@ -1,7 +1,7 @@
 - 👋 Hi, I’m @kaitlinwinsIT
 - 👀 I’m interested in ... people
 - 🌱 I’m currently learning ... how to set up and the beginners run down of kali linux 
-- 💞️ I’m looking to collaborate on ... anything needed to help me compreheand these tough subjects on the computer 
+- 💞️ I’m looking to collaborate on ... anything needed to help me comprehend these tough subjects on the computer 
 - 📫 How to reach me ... email kaitwinit@outlook.com
 - 😄 Pronouns: ... she/her
 - ⚡ Fun fact: ... I tune most of what i hear out by accident. #ADHD
