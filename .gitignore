@@ -1,0 +1,7 @@
+# Ignore logs and cleanup artifacts
+CleanupLog_*.csv
+ScriptGraveyard/
+*.log
+*.tmp
+*.bak
+*.swp
