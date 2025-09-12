@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mood Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main>
+    <h1>Mood Tracker</h1>
+    <section id="mood-section">
+      <h2>Select your mood</h2>
+      <div id="mood-selector" role="radiogroup" aria-label="Mood selector"></div>
+      <button id="save-btn" aria-label="Save mood">Save Mood</button>
+    </section>
+    <section id="graph-section">
+      <h2>Past Week</h2>
+      <svg id="mood-graph" width="280" height="100" role="img" aria-label="Mood over the last seven days"></svg>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
