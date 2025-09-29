@@ -11,6 +11,3 @@ kaitlinwinsIT/kaitlinwinsIT is a ✨ special ✨ repository because its `README.
 You can click the Preview link to take a look at your changes.
 --->
 
-## Scripts
-- `scripts/FriendlyCleanup.ps1` – cleans old files while skipping excluded folders.
-- `scripts/FirewallMonitor.ps1` – monitors Windows Firewall logs, removes stale entries, and writes HTML reports.

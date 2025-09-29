@@ -1,0 +1,8 @@
+{
+  "name": "mood-tracker",
+  "version": "1.0.0",
+  "description": "Simple mood tracking interface with encrypted storage and SVG graph",
+  "scripts": {
+    "test": "echo 'No tests specified' && exit 0"
+  }
+}
