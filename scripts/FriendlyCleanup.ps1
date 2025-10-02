@@ -1,20 +1,15 @@
+
 $banner = @"
    ____                 _       ____            _       _
   / ___|___  _ __   ___| |_    / ___|___  _ __ | |_ ___| |__
  | |   / _ \| '_ \ / _ \ __|  | |   / _ \| '_ \| __/ __| '_ \
  | |__| (_) | | | |  __/ |_   | |__| (_) | | | | || (__| | | |
   \____\___/|_| |_|\___|\__|   \____\___/|_| |_|\__\___|_| |_|
-          Friendly File Cleanup • For 🕡 SECURITY & 💖 FRIENDSHIP
+
 "@
 Write-Host $banner -ForegroundColor Cyan
 
 # Configuration
-$sourcePath = "C:\\Users\\kaitw\\Documents"
-$logFolder = "C:\\Users\\kaitw\\ScriptGraveyard"
-$cutoffDays = 30
-$now = Get-Date
-$cutoffDate = $now.AddDays(-$cutoffDays)
-$logCsv = "C:\\Users\\kaitw\\CleanupLog_$($now.ToString('yyyyMMdd_HHmmss')).csv"
 $logData = @()
 
 # Excluded folders (case-insensitive match)
@@ -26,6 +21,7 @@ if (-not (Test-Path $logFolder)) {
     New-Item -ItemType Directory -Path $logFolder | Out-Null
 }
 
+##<<<<<<< codex/create-firewall-management-and-reporting-tool
 # Get old files excluding Blink folders
 $oldFiles = Get-ChildItem -Path $sourcePath -Recurse -File | Where-Object {
     $_.LastWriteTime -lt $cutoffDate -and
@@ -56,7 +52,7 @@ if ($logData.Count -gt 0) {
     Write-Host "Moved $($logData.Count) files. Log saved to $logCsv" -ForegroundColor Green
 
     # Optional: email the log to Matt
-    $mattEmail = "matt@example.com"       # <-- replace with Matt's real email
+    $mattEmail = "treycarsandsuch@gmail.com"       # <-- replace with Matt's real email
     $smtpServer = "smtp.example.com"      # <-- replace with your SMTP server
     try {
         Send-MailMessage -To $mattEmail -From "$env:USERNAME@example.com" -Subject "Cleanup Log" -Body "Files moved to $logFolder" -Attachments $logCsv -SmtpServer $smtpServer
@@ -67,3 +63,4 @@ if ($logData.Count -gt 0) {
 } else {
     Write-Host "No files older than $cutoffDays days were found." -ForegroundColor Yellow
 }
+
