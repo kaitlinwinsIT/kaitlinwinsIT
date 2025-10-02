@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "SecureJournal",
+    "slug": "secure-journal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "sdkVersion": "49.0.0",
+    "privacy": "unlisted",
+    "platforms": ["ios", "android", "web"]
+  }
+}
