@@ -1,6 +1,7 @@
-node_modules/
-.expo/
-.expo-shared/
-# OS
-.DS_Store
-
+# Ignore logs and cleanup artifacts
+CleanupLog_*.csv
+ScriptGraveyard/
+*.log
+*.tmp
+*.bak
+*.swp
