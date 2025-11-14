@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, FlatList, Alert } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SQLite from 'expo-sqlite';
@@ -57,6 +57,24 @@ export default function App() {
     }
   }, [passphrase]);
 
+  const loadEntries = useCallback(() => {
+    db.transaction(tx => {
+      tx.executeSql('SELECT * FROM entries', [], (_, { rows }) => {
+        const items = [];
+        for (let i = 0; i < rows.length; i++) {
+          items.push(rows.item(i));
+        }
+        setEntries(items);
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (authenticated) {
+      loadEntries();
+    }
+  }, [authenticated, loadEntries]);
+
   const saveEntry = async () => {
     if (!key) {
       Alert.alert('Enter passphrase');
@@ -67,18 +85,6 @@ export default function App() {
       tx.executeSql('INSERT INTO entries (content) values (?)', [cipher], () => {
         setEntry('');
         loadEntries();
-      });
-    });
-  };
-
-  const loadEntries = () => {
-    db.transaction(tx => {
-      tx.executeSql('SELECT * FROM entries', [], (_, { rows }) => {
-        const items = [];
-        for (let i = 0; i < rows.length; i++) {
-          items.push(rows.item(i));
-        }
-        setEntries(items);
       });
     });
   };
