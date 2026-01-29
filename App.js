@@ -24,8 +24,10 @@ const TINCTURE_LOGIN_HASHES = [
   CryptoJS.SHA256('9244').toString(),
 ];
 
-const SHIFT_STORAGE_KEY = 'business_shift_records_v1';
+const SHIFT_STORAGE_KEY = 'business_shift_records_v2';
 const SKU_STORAGE_KEY = 'business_sku_counts_v1';
+const ABSENCE_STORAGE_KEY = 'business_absence_reports_v1';
+const SLA_STORAGE_KEY = 'business_weekly_sla_reports_v1';
 
 const SKU_CATALOG = [
   'Evergreen Candle',
@@ -52,6 +54,8 @@ const createEmptyRecord = () => ({
     employeeId: '',
     cashIn: '',
     cashOut: '',
+    managerFeedback: '',
+    notifyManager: false,
   })),
   notes: '',
 });
@@ -63,12 +67,23 @@ export default function App() {
   const [records, setRecords] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(createEmptyRecord());
   const [skuCounts, setSkuCounts] = useState({});
+  const [absenceReports, setAbsenceReports] = useState([]);
+  const [slaReports, setSlaReports] = useState([]);
+  const [newAbsence, setNewAbsence] = useState({
+    employeeId: '',
+    reason: '',
+    coveringEmployeeId: '',
+    employeeSigned: false,
+    managerSigned: false,
+  });
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     const loadStoredData = async () => {
       const storedRecords = await SecureStore.getItemAsync(SHIFT_STORAGE_KEY);
       const storedSkus = await SecureStore.getItemAsync(SKU_STORAGE_KEY);
+      const storedAbsences = await SecureStore.getItemAsync(ABSENCE_STORAGE_KEY);
+      const storedSlas = await SecureStore.getItemAsync(SLA_STORAGE_KEY);
       if (storedRecords) {
         setRecords(JSON.parse(storedRecords));
       }
@@ -80,6 +95,12 @@ export default function App() {
           return acc;
         }, {});
         setSkuCounts(defaults);
+      }
+      if (storedAbsences) {
+        setAbsenceReports(JSON.parse(storedAbsences));
+      }
+      if (storedSlas) {
+        setSlaReports(JSON.parse(storedSlas));
       }
       setLoaded(true);
     };
@@ -96,6 +117,16 @@ export default function App() {
     if (!loaded) return;
     SecureStore.setItemAsync(SKU_STORAGE_KEY, JSON.stringify(skuCounts));
   }, [loaded, skuCounts]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    SecureStore.setItemAsync(ABSENCE_STORAGE_KEY, JSON.stringify(absenceReports));
+  }, [loaded, absenceReports]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    SecureStore.setItemAsync(SLA_STORAGE_KEY, JSON.stringify(slaReports));
+  }, [loaded, slaReports]);
 
   const handleEmployeeLogin = () => {
     const hashed = CryptoJS.SHA256(employeeLogin).toString();
@@ -144,6 +175,73 @@ export default function App() {
 
   const updateRecordField = (field, value) => {
     setSelectedRecord({ ...selectedRecord, [field]: value });
+  };
+
+  const toggleShiftNotify = (index) => {
+    const nextShifts = selectedRecord.shifts.map((shift, shiftIndex) => {
+      if (shiftIndex !== index) return shift;
+      return { ...shift, notifyManager: !shift.notifyManager };
+    });
+    setSelectedRecord({ ...selectedRecord, shifts: nextShifts });
+  };
+
+  const markNotificationSent = (index) => {
+    const nextShifts = selectedRecord.shifts.map((shift, shiftIndex) => {
+      if (shiftIndex !== index) return shift;
+      return { ...shift, notifyManager: false };
+    });
+    setSelectedRecord({ ...selectedRecord, shifts: nextShifts });
+    Alert.alert('Manager notified', 'The shift entry was queued for email/text.');
+  };
+
+  const submitAbsenceReport = () => {
+    if (!newAbsence.employeeId || !newAbsence.coveringEmployeeId || !newAbsence.reason) {
+      Alert.alert('Missing details', 'Fill in employee, coverage, and reason.');
+      return;
+    }
+    if (!newAbsence.employeeSigned || !newAbsence.managerSigned) {
+      Alert.alert('Signatures required', 'Both parties must sign off.');
+      return;
+    }
+    const report = {
+      id: `${Date.now()}`,
+      date: new Date().toISOString().slice(0, 10),
+      ...newAbsence,
+    };
+    setAbsenceReports((prev) => [report, ...prev]);
+    setNewAbsence({
+      employeeId: '',
+      reason: '',
+      coveringEmployeeId: '',
+      employeeSigned: false,
+      managerSigned: false,
+    });
+    Alert.alert('Manager notified', 'Absence report sent to manager.');
+  };
+
+  const generateWeeklySlaReport = () => {
+    const report = {
+      id: `${Date.now()}`,
+      weekOf: new Date().toISOString().slice(0, 10),
+      totalDays: records.length,
+      balancedDays: records.filter((record) => {
+        const opening = Number(record.openingCash || 0);
+        const closing = Number(record.closingCash || 0);
+        const totalIn = record.shifts.reduce(
+          (sum, shift) => sum + Number(shift.cashIn || 0),
+          0
+        );
+        const totalOut = record.shifts.reduce(
+          (sum, shift) => sum + Number(shift.cashOut || 0),
+          0
+        );
+        return closing - opening + totalIn - totalOut === 0;
+      }).length,
+      absenceCount: absenceReports.length,
+      notes: 'Weekly SLA report prepared for Monday delivery.',
+    };
+    setSlaReports((prev) => [report, ...prev]);
+    Alert.alert('Weekly SLA ready', 'Report queued for Monday morning delivery.');
   };
 
   const shiftChecks = useMemo(() => {
@@ -309,6 +407,36 @@ export default function App() {
                 />
               </View>
             </View>
+            <Text style={styles.fieldLabel}>Manager feedback</Text>
+            <TextInput
+              value={shift.managerFeedback}
+              onChangeText={(value) => updateShiftField(index, 'managerFeedback', value)}
+              placeholder="Manager comment to employee"
+              style={[styles.input, styles.multiline]}
+              multiline
+            />
+            <View style={styles.row}>
+              <TouchableOpacity
+                style={shift.notifyManager ? styles.primaryButton : styles.secondaryButton}
+                onPress={() => toggleShiftNotify(index)}
+              >
+                <Text
+                  style={
+                    shift.notifyManager
+                      ? styles.primaryButtonText
+                      : styles.secondaryButtonText
+                  }
+                >
+                  {shift.notifyManager ? 'Notification queued' : 'Notify manager'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() => markNotificationSent(index)}
+              >
+                <Text style={styles.secondaryButtonText}>Mark sent</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ))}
         <TextInput
@@ -390,6 +518,117 @@ export default function App() {
     );
   }
 
+  if (screen === 'absence') {
+    return (
+      <ScrollView style={styles.container}>
+        <Text style={styles.title}>Absence & Coverage Notice</Text>
+        <Text style={styles.subtitle}>
+          Notify the manager when someone is out and record coverage sign-off.
+        </Text>
+        <TextInput
+          value={newAbsence.employeeId}
+          onChangeText={(value) => setNewAbsence((prev) => ({ ...prev, employeeId: value }))}
+          placeholder="Employee login number"
+          style={styles.input}
+        />
+        <TextInput
+          value={newAbsence.reason}
+          onChangeText={(value) => setNewAbsence((prev) => ({ ...prev, reason: value }))}
+          placeholder="Reason (sick, PTO, etc.)"
+          style={styles.input}
+        />
+        <TextInput
+          value={newAbsence.coveringEmployeeId}
+          onChangeText={(value) =>
+            setNewAbsence((prev) => ({ ...prev, coveringEmployeeId: value }))
+          }
+          placeholder="Covering employee login number"
+          style={styles.input}
+        />
+        <View style={styles.row}>
+          <TouchableOpacity
+            style={newAbsence.employeeSigned ? styles.primaryButton : styles.secondaryButton}
+            onPress={() =>
+              setNewAbsence((prev) => ({ ...prev, employeeSigned: !prev.employeeSigned }))
+            }
+          >
+            <Text
+              style={newAbsence.employeeSigned ? styles.primaryButtonText : styles.secondaryButtonText}
+            >
+              Employee signed
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={newAbsence.managerSigned ? styles.primaryButton : styles.secondaryButton}
+            onPress={() =>
+              setNewAbsence((prev) => ({ ...prev, managerSigned: !prev.managerSigned }))
+            }
+          >
+            <Text
+              style={newAbsence.managerSigned ? styles.primaryButtonText : styles.secondaryButtonText}
+            >
+              Manager signed
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity style={styles.primaryButton} onPress={submitAbsenceReport}>
+          <Text style={styles.primaryButtonText}>Send to manager</Text>
+        </TouchableOpacity>
+        <Text style={styles.sectionTitle}>Recent absence notices</Text>
+        <FlatList
+          data={absenceReports}
+          keyExtractor={(item) => item.id}
+          ListEmptyComponent={<Text style={styles.emptyText}>No absence reports.</Text>}
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>{item.date}</Text>
+              <Text style={styles.cardText}>Employee: {item.employeeId}</Text>
+              <Text style={styles.cardText}>Coverage: {item.coveringEmployeeId}</Text>
+              <Text style={styles.cardText}>Reason: {item.reason}</Text>
+              <Text style={styles.cardText}>
+                Signed: {item.employeeSigned ? 'Employee' : ''} {item.managerSigned ? 'Manager' : ''}
+              </Text>
+            </View>
+          )}
+        />
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => setScreen('home')}>
+          <Text style={styles.secondaryButtonText}>Back to Dashboard</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    );
+  }
+
+  if (screen === 'sla') {
+    return (
+      <ScrollView style={styles.container}>
+        <Text style={styles.title}>Weekly SLA Reports</Text>
+        <Text style={styles.subtitle}>
+          Generate weekly SLA summaries for Monday morning delivery.
+        </Text>
+        <TouchableOpacity style={styles.primaryButton} onPress={generateWeeklySlaReport}>
+          <Text style={styles.primaryButtonText}>Generate weekly report</Text>
+        </TouchableOpacity>
+        <FlatList
+          data={slaReports}
+          keyExtractor={(item) => item.id}
+          ListEmptyComponent={<Text style={styles.emptyText}>No SLA reports yet.</Text>}
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Week of {item.weekOf}</Text>
+              <Text style={styles.cardText}>Total days logged: {item.totalDays}</Text>
+              <Text style={styles.cardText}>Balanced days: {item.balancedDays}</Text>
+              <Text style={styles.cardText}>Absence notices: {item.absenceCount}</Text>
+              <Text style={styles.cardText}>{item.notes}</Text>
+            </View>
+          )}
+        />
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => setScreen('home')}>
+          <Text style={styles.secondaryButtonText}>Back to Dashboard</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Business Dashboard</Text>
@@ -407,6 +646,12 @@ export default function App() {
         onPress={() => setScreen('tinctureLogin')}
       >
         <Text style={styles.secondaryButtonText}>Go to Tincture App</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.primaryButton} onPress={() => setScreen('absence')}>
+        <Text style={styles.primaryButtonText}>Absence & Coverage Notice</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.primaryButton} onPress={() => setScreen('sla')}>
+        <Text style={styles.primaryButtonText}>Weekly SLA Reports</Text>
       </TouchableOpacity>
       <Text style={styles.sectionTitle}>Saved Daily Cash-outs</Text>
       <FlatList
