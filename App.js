@@ -24,17 +24,17 @@ const TINCTURE_LOGIN_HASHES = [
   CryptoJS.SHA256('9244').toString(),
 ];
 
-const SHIFT_STORAGE_KEY = 'business_shift_records_v2';
+const SHIFT_STORAGE_KEY = 'business_shift_records_v3';
 const SKU_STORAGE_KEY = 'business_sku_counts_v1';
 const ABSENCE_STORAGE_KEY = 'business_absence_reports_v1';
 const SLA_STORAGE_KEY = 'business_weekly_sla_reports_v1';
 
 const SKU_CATALOG = [
-  'Evergreen Candle',
-  'Vanilla Amber Candle',
-  'Citrus Bloom Candle',
-  'Midnight Cedar Candle',
-  'Lavender Drift Candle',
+  'Philips LED Bulb',
+  'Philips Tube Light',
+  'Philips Smart Plug',
+  'Philips Fixture Housing',
+  'Philips Battery Pack',
 ];
 
 const TINCTURE_MENU = [
@@ -57,6 +57,19 @@ const createEmptyRecord = () => ({
     managerFeedback: '',
     notifyManager: false,
   })),
+  inventoryLines: SKU_CATALOG.map((sku) => ({
+    sku,
+    inCount: '',
+    outCount: '',
+    soldCount: '',
+    unitValue: '',
+  })),
+  barter: {
+    description: '',
+    value: '',
+    secondEmployeeId: '',
+    secondEmployeeSigned: false,
+  },
   notes: '',
 });
 
@@ -154,6 +167,29 @@ export default function App() {
   };
 
   const saveRecord = () => {
+    const incompleteLine = selectedRecord.inventoryLines.find(
+      (line) => !isLineComplete(line)
+    );
+    if (incompleteLine) {
+      Alert.alert(
+        'Incomplete inventory line',
+        'Complete each inventory row before saving.'
+      );
+      return;
+    }
+    if (
+      selectedRecord.barter.description ||
+      selectedRecord.barter.value ||
+      selectedRecord.barter.secondEmployeeId
+    ) {
+      if (!selectedRecord.barter.secondEmployeeSigned) {
+        Alert.alert(
+          'Second employee sign-off required',
+          'Barter transactions must be signed by a second employee.'
+        );
+        return;
+      }
+    }
     const updatedRecords = records.filter((record) => record.id !== selectedRecord.id);
     updatedRecords.unshift(selectedRecord);
     setRecords(updatedRecords);
@@ -175,6 +211,31 @@ export default function App() {
 
   const updateRecordField = (field, value) => {
     setSelectedRecord({ ...selectedRecord, [field]: value });
+  };
+
+  const updateInventoryLine = (index, field, value) => {
+    const nextLines = selectedRecord.inventoryLines.map((line, lineIndex) => {
+      if (lineIndex !== index) return line;
+      return { ...line, [field]: value };
+    });
+    setSelectedRecord({ ...selectedRecord, inventoryLines: nextLines });
+  };
+
+  const isLineComplete = (line) =>
+    line.sku &&
+    line.inCount !== '' &&
+    line.outCount !== '' &&
+    line.soldCount !== '' &&
+    line.unitValue !== '';
+
+  const getLineTotal = (line) =>
+    (Number(line.soldCount || 0) * Number(line.unitValue || 0)).toFixed(2);
+
+  const updateBarter = (field, value) => {
+    setSelectedRecord({
+      ...selectedRecord,
+      barter: { ...selectedRecord.barter, [field]: value },
+    });
   };
 
   const toggleShiftNotify = (index) => {
@@ -439,6 +500,63 @@ export default function App() {
             </View>
           </View>
         ))}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Inventory & Sales Template</Text>
+          <View style={[styles.row, styles.tableHeader]}>
+            <Text style={[styles.tableHeaderText, styles.skuColumn]}>SKU</Text>
+            <Text style={styles.tableHeaderText}>IN</Text>
+            <Text style={styles.tableHeaderText}>OUT</Text>
+            <Text style={styles.tableHeaderText}>SOLD</Text>
+            <Text style={styles.tableHeaderText}>$$$</Text>
+          </View>
+          {selectedRecord.inventoryLines.map((line, index) => {
+            const canEdit =
+              index === 0 || isLineComplete(selectedRecord.inventoryLines[index - 1]);
+            return (
+              <View
+                key={line.sku}
+                style={[styles.row, styles.tableRow, !canEdit && styles.disabledRow]}
+              >
+                <Text style={[styles.tableCellText, styles.skuColumn]}>{line.sku}</Text>
+                <TextInput
+                  value={line.inCount}
+                  onChangeText={(value) => updateInventoryLine(index, 'inCount', value)}
+                  keyboardType="number-pad"
+                  style={[styles.tableInput, !canEdit && styles.disabledInput]}
+                  editable={canEdit}
+                />
+                <TextInput
+                  value={line.outCount}
+                  onChangeText={(value) => updateInventoryLine(index, 'outCount', value)}
+                  keyboardType="number-pad"
+                  style={[styles.tableInput, !canEdit && styles.disabledInput]}
+                  editable={canEdit}
+                />
+                <TextInput
+                  value={line.soldCount}
+                  onChangeText={(value) => updateInventoryLine(index, 'soldCount', value)}
+                  keyboardType="number-pad"
+                  style={[styles.tableInput, !canEdit && styles.disabledInput]}
+                  editable={canEdit}
+                />
+                <View style={styles.tableValueCell}>
+                  <TextInput
+                    value={line.unitValue}
+                    onChangeText={(value) => updateInventoryLine(index, 'unitValue', value)}
+                    keyboardType="decimal-pad"
+                    style={[styles.tableInput, !canEdit && styles.disabledInput]}
+                    editable={canEdit}
+                  />
+                  <Text style={styles.tableValueText}>x</Text>
+                  <Text style={styles.tableValueText}>{getLineTotal(line)}</Text>
+                </View>
+              </View>
+            );
+          })}
+          <Text style={styles.helperText}>
+            Complete each row before moving to the next line.
+          </Text>
+        </View>
         <TextInput
           value={selectedRecord.notes}
           onChangeText={(value) => updateRecordField('notes', value)}
@@ -446,6 +564,73 @@ export default function App() {
           style={[styles.input, styles.multiline]}
           multiline
         />
+        <View style={styles.sectionRow}>
+          <View style={styles.sectionBox}>
+            <Text style={styles.sectionBoxTitle}>Authorizations</Text>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => Alert.alert('Manager notified', 'Manager has been alerted.')}
+            >
+              <Text style={styles.secondaryButtonText}>Notify manager</Text>
+            </TouchableOpacity>
+            <Text style={styles.helperText}>
+              Manager feedback is captured per shift above.
+            </Text>
+          </View>
+          <View style={styles.sectionBox}>
+            <Text style={styles.sectionBoxTitle}>Notes</Text>
+            <Text style={styles.helperText}>
+              Use the daily notes field to log order requests and restock needs.
+            </Text>
+          </View>
+          <View style={styles.sectionBox}>
+            <Text style={styles.sectionBoxTitle}>Merch / Barter</Text>
+            <TextInput
+              value={selectedRecord.barter.description}
+              onChangeText={(value) => updateBarter('description', value)}
+              placeholder="Merch description"
+              style={styles.input}
+            />
+            <TextInput
+              value={selectedRecord.barter.value}
+              onChangeText={(value) => updateBarter('value', value)}
+              placeholder="Merch value"
+              keyboardType="decimal-pad"
+              style={styles.input}
+            />
+            <TextInput
+              value={selectedRecord.barter.secondEmployeeId}
+              onChangeText={(value) => updateBarter('secondEmployeeId', value)}
+              placeholder="Second employee sign-off ID"
+              style={styles.input}
+            />
+            <TouchableOpacity
+              style={
+                selectedRecord.barter.secondEmployeeSigned
+                  ? styles.primaryButton
+                  : styles.secondaryButton
+              }
+              onPress={() =>
+                updateBarter(
+                  'secondEmployeeSigned',
+                  !selectedRecord.barter.secondEmployeeSigned
+                )
+              }
+            >
+              <Text
+                style={
+                  selectedRecord.barter.secondEmployeeSigned
+                    ? styles.primaryButtonText
+                    : styles.secondaryButtonText
+                }
+              >
+                {selectedRecord.barter.secondEmployeeSigned
+                  ? 'Second employee signed'
+                  : 'Second employee sign-off'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
         <View style={styles.summaryBox}>
           <Text style={styles.summaryTitle}>Daily balance check</Text>
           <Text style={styles.summaryText}>
@@ -475,7 +660,7 @@ export default function App() {
       <View style={styles.container}>
         <Text style={styles.title}>SKU Tracker</Text>
         <Text style={styles.subtitle}>
-          Track candle SKUs by count for each day.
+          Track Philips recycling SKUs by count for each day.
         </Text>
         <FlatList
           data={SKU_CATALOG}
@@ -682,31 +867,58 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     paddingTop: 48,
-    backgroundColor: '#0f1218',
+    backgroundColor: '#f4f4f4',
   },
   title: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#f5f7ff',
+    color: '#111111',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#c3cad9',
+    color: '#4a4a4a',
     marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 16,
-    color: '#e6e9f5',
+    color: '#111111',
     marginTop: 20,
     marginBottom: 10,
     fontWeight: '600',
   },
+  sectionCard: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d1d1',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  sectionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+    flexWrap: 'wrap',
+  },
+  sectionBox: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d1d1',
+    borderRadius: 12,
+    padding: 12,
+  },
+  sectionBoxTitle: {
+    color: '#111111',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
   input: {
     borderWidth: 1,
-    borderColor: '#2a2f3d',
-    backgroundColor: '#181c24',
-    color: '#f5f7ff',
+    borderColor: '#bdbdbd',
+    backgroundColor: '#ffffff',
+    color: '#111111',
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
@@ -716,25 +928,25 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   primaryButton: {
-    backgroundColor: '#5c6eff',
+    backgroundColor: '#111111',
     padding: 14,
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 12,
   },
   primaryButtonText: {
-    color: '#f5f7ff',
+    color: '#ffffff',
     fontWeight: '600',
   },
   secondaryButton: {
-    backgroundColor: '#232837',
+    backgroundColor: '#e0e0e0',
     padding: 14,
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 12,
   },
   secondaryButtonText: {
-    color: '#d0d6e6',
+    color: '#111111',
     fontWeight: '600',
   },
   linkButton: {
@@ -742,64 +954,123 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   linkText: {
-    color: '#9aa9ff',
+    color: '#111111',
   },
   card: {
-    backgroundColor: '#181c24',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d1d1',
     borderRadius: 12,
     padding: 14,
     marginBottom: 12,
   },
   cardTitle: {
-    color: '#f5f7ff',
+    color: '#111111',
     fontWeight: '600',
     marginBottom: 6,
   },
   cardText: {
-    color: '#c3cad9',
+    color: '#4a4a4a',
   },
   row: {
     flexDirection: 'row',
     gap: 12,
   },
+  tableHeader: {
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#bdbdbd',
+    marginBottom: 8,
+  },
+  tableHeaderText: {
+    color: '#111111',
+    fontWeight: '600',
+    width: 60,
+    textAlign: 'center',
+  },
+  tableRow: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  skuColumn: {
+    flex: 1,
+    width: 'auto',
+    textAlign: 'left',
+  },
+  tableCellText: {
+    color: '#4a4a4a',
+  },
+  tableInput: {
+    borderWidth: 1,
+    borderColor: '#bdbdbd',
+    backgroundColor: '#ffffff',
+    color: '#111111',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    width: 60,
+    textAlign: 'center',
+  },
+  tableValueCell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  tableValueText: {
+    color: '#111111',
+    fontSize: 12,
+  },
+  helperText: {
+    color: '#6b6b6b',
+    fontSize: 12,
+    marginTop: 6,
+  },
+  disabledRow: {
+    opacity: 0.4,
+  },
+  disabledInput: {
+    opacity: 0.6,
+  },
   flexField: {
     flex: 1,
   },
   fieldLabel: {
-    color: '#aab2c5',
+    color: '#4a4a4a',
     marginBottom: 6,
   },
   summaryBox: {
-    backgroundColor: '#1d2330',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d1d1',
     padding: 14,
     borderRadius: 12,
     marginBottom: 16,
   },
   summaryTitle: {
-    color: '#f5f7ff',
+    color: '#111111',
     fontWeight: '600',
     marginBottom: 6,
   },
   summaryText: {
-    color: '#c3cad9',
+    color: '#4a4a4a',
   },
   counterButton: {
-    backgroundColor: '#2f3545',
+    backgroundColor: '#e0e0e0',
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 14,
   },
   counterText: {
-    color: '#f5f7ff',
+    color: '#111111',
     fontSize: 18,
   },
   counterValue: {
-    color: '#f5f7ff',
+    color: '#111111',
     fontSize: 18,
     paddingHorizontal: 12,
   },
   emptyText: {
-    color: '#8b93a8',
+    color: '#6b6b6b',
     marginBottom: 12,
   },
 });
