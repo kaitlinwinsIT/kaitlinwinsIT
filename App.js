@@ -151,6 +151,27 @@ export default function App() {
     setScreen('home');
   };
 
+  const loadEntries = useCallback(() => {
+    db.transaction(tx => {
+      tx.executeSql('SELECT * FROM entries', [], (_, { rows }) => {
+        const items = [];
+        for (let i = 0; i < rows.length; i++) {
+          items.push(rows.item(i));
+        }
+        setEntries(items);
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (authenticated) {
+      loadEntries();
+    }
+  }, [authenticated, loadEntries]);
+
+  const saveEntry = async () => {
+    if (!key) {
+      Alert.alert('Enter passphrase');
   const handleTinctureLogin = () => {
     const hashed = CryptoJS.SHA256(tinctureLogin).toString();
     if (!TINCTURE_LOGIN_HASHES.includes(hashed)) {
@@ -209,6 +230,15 @@ export default function App() {
     setSelectedRecord({ ...selectedRecord, shifts: nextShifts });
   };
 
+  const renderItem = ({ item }) => {
+    let text = 'Unable to decrypt';
+    if (key) {
+      try {
+        const decrypted = CryptoJS.AES.decrypt(item.content, CryptoJS.enc.Hex.parse(bytesToHex(key))).toString(CryptoJS.enc.Utf8);
+        text = decrypted;
+      } catch (e) {
+        // ignore
+      }
   const updateRecordField = (field, value) => {
     setSelectedRecord({ ...selectedRecord, [field]: value });
   };
